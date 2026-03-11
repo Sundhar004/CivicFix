@@ -1,16 +1,18 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from 'react-leaflet'
 import L from 'leaflet'
 
 // Fix for default marker icon in Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-})
+if (typeof window !== 'undefined') {
+  delete (L.Icon.Default.prototype as any)._getIconUrl
+  L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+    iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+    shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+  })
+}
 
 const customIcons = {
   open: new L.Icon({
@@ -55,13 +57,23 @@ interface MapProps {
   onLocationSelect?: (lat: number, lng: number) => void
 }
 
+function RecenterMap({ position }: { position: [number, number] | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (position) {
+      map.flyTo(position, 16, { animate: true })
+    }
+  }, [position, map])
+  return null
+}
+
 function LocationSelector({ onLocationSelect, selectedPos }: { onLocationSelect: (lat: number, lng: number) => void, selectedPos: [number, number] | null }) {
   useMapEvents({
     click(e) {
       onLocationSelect(e.latlng.lat, e.latlng.lng)
     },
   })
-  
+
   return selectedPos ? <Marker position={selectedPos} /> : null
 }
 
@@ -76,7 +88,7 @@ export default function Map({ issues = [], selectable = false, selectedPos = nul
     return <div className="w-full h-[500px] bg-gray-200 animate-pulse rounded-lg flex items-center justify-center">Loading map...</div>
   }
 
-  const center: [number, number] = issues.length > 0 
+  const center: [number, number] = issues.length > 0
     ? [issues[0].lat, issues[0].lng]
     : [40.7128, -74.0060] // NY default
 
@@ -87,11 +99,13 @@ export default function Map({ issues = [], selectable = false, selectedPos = nul
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
-        {issues.map((issue) => (
-          <Marker 
-            key={issue.id} 
-            position={[issue.lat, issue.lng]} 
+
+        <RecenterMap position={selectedPos} />
+
+        {issues.map((issue: any) => (
+          <Marker
+            key={issue.id}
+            position={[issue.lat, issue.lng]}
             icon={customIcons[issue.status as keyof typeof customIcons] || customIcons.open}
           >
             <Popup>
@@ -99,11 +113,10 @@ export default function Map({ issues = [], selectable = false, selectedPos = nul
                 <h3 className="font-bold text-lg mb-1">{issue.title}</h3>
                 <p className="text-sm text-gray-600 mb-2 truncate max-w-[200px]">{issue.description}</p>
                 <div className="flex justify-between items-center text-xs">
-                  <span className={`px-2 py-1 rounded-full font-semibold ${
-                    issue.status === 'open' ? 'bg-red-100 text-red-800' :
-                    issue.status === 'claimed' ? 'bg-orange-100 text-orange-800' :
-                    'bg-green-100 text-green-800'
-                  }`}>
+                  <span className={`px-2 py-1 rounded-full font-semibold ${issue.status === 'open' ? 'bg-red-100 text-red-800' :
+                      issue.status === 'claimed' ? 'bg-orange-100 text-orange-800' :
+                        'bg-green-100 text-green-800'
+                    }`}>
                     {issue.status.toUpperCase()}
                   </span>
                   <a href={`/issue/${issue.id}`} className="text-blue-600 hover:underline">View Details →</a>

@@ -2,28 +2,56 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 export default function Header() {
     const [role, setRole] = useState<'citizen' | 'officer' | 'anon'>('anon')
     const [loading, setLoading] = useState(true)
+    const [user, setUser] = useState<any>(null)
+    const router = useRouter()
+    const pathname = usePathname()
 
     useEffect(() => {
-        async function checkRole() {
-            const { data: userData } = await supabase.auth.getUser()
-            if (userData?.user) {
+        const fetchUserAndRole = async (sessionUser: any) => {
+            if (sessionUser) {
+                setUser(sessionUser)
                 const { data: roleData } = await supabase
                     .from('user_roles')
                     .select('role')
-                    .eq('user_id', userData.user.id)
+                    .eq('user_id', sessionUser.id)
                     .single()
 
-                if (roleData) setRole(roleData.role as any)
+                if (roleData) {
+                    setRole(roleData.role as any)
+                } else {
+                    setRole('anon')
+                }
+            } else {
+                setUser(null)
+                setRole('anon')
             }
             setLoading(false)
         }
-        checkRole()
+
+        // Initial check
+        supabase.auth.getUser().then(({ data }) => {
+            fetchUserAndRole(data.user)
+        })
+
+        // Listen for changes
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            fetchUserAndRole(session?.user || null)
+        })
+
+        return () => subscription.unsubscribe()
     }, [])
+
+    const handleSignOut = async () => {
+        await supabase.auth.signOut()
+        router.push('/login')
+        router.refresh()
+    }
 
     return (
         <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
@@ -34,13 +62,13 @@ export default function Header() {
                 </div>
 
                 <nav className="hidden md:flex items-center gap-8 text-sm font-bold text-gray-500">
-                    <Link href="/" className="hover:text-blue-600 transition">Map</Link>
-                    <Link href="/issues" className="hover:text-blue-600 transition">Browse</Link>
+                    <Link href="/" className={`transition ${pathname === '/' ? 'text-blue-600' : 'hover:text-blue-600'}`}>Map</Link>
+                    <Link href="/issues" className={`transition ${pathname === '/issues' ? 'text-blue-600' : 'hover:text-blue-600'}`}>Browse</Link>
                     {role === 'citizen' && (
-                        <Link href="/my-issues" className="hover:text-blue-600 transition">My Reports</Link>
+                        <Link href="/my-issues" className={`transition ${pathname === '/my-issues' ? 'text-blue-600' : 'hover:text-blue-600'}`}>My Reports</Link>
                     )}
                     {role === 'officer' && (
-                        <Link href="/officer" className="hover:orange-600 transition text-orange-500">Officer Portal</Link>
+                        <Link href="/officer" className={`transition ${pathname === '/officer' ? 'text-orange-500' : 'text-orange-500 hover:text-orange-600'}`}>Officer Portal</Link>
                     )}
                 </nav>
 
@@ -50,9 +78,19 @@ export default function Header() {
                             Report Issue
                         </Link>
                     )}
-                    <Link href="/login" className="text-gray-400 hover:text-gray-600 transition font-bold text-sm">
-                        Account
-                    </Link>
+
+                    {user ? (
+                        <button
+                            onClick={handleSignOut}
+                            className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold transition"
+                        >
+                            Sign Out
+                        </button>
+                    ) : (
+                        <Link href="/login" className="text-gray-400 hover:text-gray-600 transition font-bold text-sm">
+                            Sign In
+                        </Link>
+                    )}
                 </div>
             </div>
         </header>

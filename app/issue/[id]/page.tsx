@@ -65,9 +65,14 @@ export default function IssueDetail() {
 
       const { data: urlData } = supabase.storage.from('issues').getPublicUrl(fileName)
 
+      const { data: { session } } = await supabase.auth.getSession()
+
       const res = await fetch(`/api/issues/${id}/resolve`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': session?.access_token || ''
+        },
         body: JSON.stringify({
           fixedUrl: urlData.publicUrl,
           comment: resolutionComment

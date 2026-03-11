@@ -4,11 +4,11 @@ import { createClient } from '@supabase/supabase-js'
 export async function PUT(req: Request, { params }: { params: { id: string } }) {
   const body = await req.json()
   const authHeader = req.headers.get('authorization')
-  
-  // To avoid complex role-based RLS on API routes without passing custom headers,
-  // we'll use the service role key to enforce server-side business logic 
-  // after validating the user's role ourselves, fulfilling the requirement securely.
-  
+
+  if (!authHeader) {
+    return NextResponse.json({ error: 'Missing authorization header' }, { status: 101 })
+  }
+
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -21,15 +21,25 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   )
 
   try {
-    // We already do role checking usually on frontend, but we'll bypass RLS with admin
-    // if `authHeader` doesn't fully map to auth.role() = 'officer' because custom claims are missing.
-    // We update the issue with service role, but we could also try standard RLS.
-    // Given the user specifically requested SUPABASE_SERVICE_ROLE_KEY env var,
-    // they intend for us to use it for admin endpoints like claim/resolve.
+    // 1. Get the authenticated user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) throw new Error('Unauthorized')
 
+    // 2. Check their role in user_roles table
+    const { data: roleData, error: roleError } = await adminSupabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .single()
+
+    if (roleError || roleData?.role !== 'officer') {
+      return NextResponse.json({ error: 'Only officers can claim issues' }, { status: 403 })
+    }
+
+    // 3. Update the issue
     const { data: issue, error } = await adminSupabase
       .from('issues')
-      .update({ status: 'claimed', claimed_by: body.userId })
+      .update({ status: 'claimed', claimed_by: user.id })
       .eq('id', params.id)
       .select()
 

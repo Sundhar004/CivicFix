@@ -68,13 +68,16 @@ export default function OfficerDashboard() {
 
   async function claimIssue(id: string) {
     try {
-      const { data: userData } = await supabase.auth.getUser()
-      if (!userData?.user) return
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.user) return
 
       const { error } = await fetch(`/api/issues/${id}/claim`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: userData.user.id })
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': session.access_token
+        },
+        body: JSON.stringify({ userId: session.user.id })
       }).then(res => {
         if (!res.ok) throw new Error('Failed to claim issue')
         return res.json()
