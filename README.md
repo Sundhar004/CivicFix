@@ -6,7 +6,7 @@ Crowdsourced Civic Issue Reporting MVP.
 - **Framework:** Next.js 14 (App Router)
 - **Styling:** Tailwind CSS
 - **Map:** React-Leaflet
-- **Backend:** Supabase (PostgreSQL, Auth, Storage)
+- **Backend:** PostgreSQL, Auth, Storage
 
 ## Core User Flows
 1. **Citizen:** Report a pothole or civic issue with a photo + GPS, viewable on a public map.
@@ -38,9 +38,3 @@ Crowdsourced Civic Issue Reporting MVP.
    ```bash
    npm run dev
    ```
-
-## 1-Click Vercel Deploy
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fexample%2Fcivicfix)
-
-*Note: Make sure to add your Supabase environment variables in the Vercel dashboard Settings -> Environment Variables before deploying.*
