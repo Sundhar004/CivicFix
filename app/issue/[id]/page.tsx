@@ -3,46 +3,32 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { supabase } from '@/lib/supabase'
+import { useSession } from 'next-auth/react'
 
 const MapWithNoSSR = dynamic(() => import('@/components/Map'), { ssr: false })
 
 export default function IssueDetail() {
   const { id } = useParams()
   const router = useRouter()
+  const { data: session } = useSession()
   const [issue, setIssue] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [role, setRole] = useState<'citizen' | 'officer' | 'anon'>('anon')
   const [fixedFile, setFixedFile] = useState<File | null>(null)
   const [resolving, setResolving] = useState(false)
+  const [claiming, setClaiming] = useState(false)
   const [resolutionComment, setResolutionComment] = useState('')
 
   useEffect(() => {
-    fetchIssueAndRole()
+    fetchIssue()
   }, [])
 
-  async function fetchIssueAndRole() {
+  async function fetchIssue() {
     try {
-      const { data: issueData, error: issueError } = await supabase
-        .from('issues')
-        .select('*')
-        .eq('id', id)
-        .single()
-
-      if (issueError) throw issueError
-      setIssue(issueData)
-
-      const { data: userData } = await supabase.auth.getUser()
-      if (userData?.user) {
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userData.user.id)
-          .single()
-
-        if (roleData) setRole(roleData.role as any)
-      }
+      const res = await fetch(`/api/issues/${id}`)
+      if (!res.ok) throw new Error('Issue not found')
+      const data = await res.json()
+      setIssue(data)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -55,33 +41,31 @@ export default function IssueDetail() {
     setResolving(true)
 
     try {
-      const fileExt = fixedFile.name.split('.').pop()
-      const fileName = `fixed-${Math.random()}.${fileExt}`
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('issues')
-        .upload(fileName, fixedFile)
-
-      if (uploadError) throw new Error('Image upload failed: ' + uploadError.message)
-
-      const { data: urlData } = supabase.storage.from('issues').getPublicUrl(fileName)
-
-      const { data: { session } } = await supabase.auth.getSession()
+      const formData = new FormData()
+      formData.append('file', fixedFile)
+      const uploadRes = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      })
+      const uploadData = await uploadRes.json()
+      if (!uploadRes.ok) throw new Error(uploadData.error || 'Image upload failed')
+      
+      const fixedUrl = uploadData.url
 
       const res = await fetch(`/api/issues/${id}/resolve`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': session?.access_token || ''
         },
         body: JSON.stringify({
-          fixedUrl: urlData.publicUrl,
+          fixedUrl: fixedUrl,
           comment: resolutionComment
         })
       })
 
       if (!res.ok) throw new Error('Failed to resolve issue')
 
-      fetchIssueAndRole()
+      fetchIssue()
     } catch (err: any) {
       alert(err.message)
     } finally {
@@ -89,11 +73,40 @@ export default function IssueDetail() {
     }
   }
 
+  async function claimIssue() {
+    setClaiming(true)
+    try {
+      const res = await fetch(`/api/issues/${id}/claim`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({})
+      })
+      
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error || 'Failed to claim issue')
+      }
+      
+      fetchIssue()
+    } catch (err: any) {
+      alert(err.message)
+    } finally {
+      setClaiming(false)
+    }
+  }
+
   if (error) return <div className="max-w-4xl mx-auto py-8 text-center text-red-600 bg-red-50 p-6 rounded-xl font-bold">{error}</div>
   if (loading) return <div className="max-w-4xl mx-auto py-8 text-center font-bold text-gray-500 animate-pulse bg-white p-6 rounded-xl shadow-sm border border-gray-100">Loading details...</div>
   if (!issue) return <div className="max-w-4xl mx-auto py-8 text-center bg-white p-6 rounded-xl shadow-md font-medium text-gray-500">Issue not found.</div>
 
-  const isOfficer = role === 'officer'
+  const isOfficer = (session?.user as any)?.role === 'officer'
+  const imageUrl = issue.image_url || issue.imageUrl
+  const fixedImageUrl = issue.fixed_image_url || issue.fixedImageUrl
+  const resComment = issue.resolution_comment || issue.resolutionComment
+  const createdAt = issue.created_at || issue.createdAt
+  const updatedAt = issue.updated_at || issue.updatedAt
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-12">
@@ -106,35 +119,35 @@ export default function IssueDetail() {
               }`}>
               {issue.status}
             </span>
-            <span className="text-sm font-medium text-gray-400">{new Date(issue.created_at).toLocaleDateString()}</span>
+            <span className="text-sm font-medium text-gray-400">{new Date(createdAt).toLocaleDateString()}</span>
           </div>
 
           <h1 className="text-3xl font-extrabold text-gray-900 mb-4 tracking-tight leading-tight">{issue.title}</h1>
           <p className="text-gray-600 text-base leading-relaxed mb-8">{issue.description}</p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-            {issue.image_url && (
+            {imageUrl && (
               <div>
                 <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Reported Condition</h3>
                 <div className="rounded-xl overflow-hidden shadow-md border border-gray-100">
-                  <img src={issue.image_url} alt="Reported" className="w-full h-48 object-cover" />
+                  <img src={imageUrl} alt="Reported" className="w-full h-48 object-cover" />
                 </div>
               </div>
             )}
-            {issue.fixed_image_url && (
+            {fixedImageUrl && (
               <div>
                 <h3 className="text-xs font-bold text-green-600 uppercase tracking-widest mb-3">Resolution Proof</h3>
                 <div className="rounded-xl overflow-hidden shadow-md border-2 border-green-500">
-                  <img src={issue.fixed_image_url} alt="Fixed" className="w-full h-48 object-cover" />
+                  <img src={fixedImageUrl} alt="Fixed" className="w-full h-48 object-cover" />
                 </div>
               </div>
             )}
           </div>
 
-          {issue.resolution_comment && (
+          {resComment && (
             <div className="bg-green-50 p-6 rounded-2xl border border-green-100 mb-8">
               <h3 className="text-sm font-bold text-green-700 uppercase tracking-widest mb-2">Officer Note</h3>
-              <p className="text-green-900 italic font-medium">"{issue.resolution_comment}"</p>
+              <p className="text-green-900 italic font-medium">"{resComment}"</p>
             </div>
           )}
 
@@ -148,7 +161,7 @@ export default function IssueDetail() {
                 </div>
                 <div>
                   <p className="text-sm font-bold text-gray-900">Reported</p>
-                  <p className="text-xs text-gray-500">{new Date(issue.created_at).toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">{new Date(createdAt).toLocaleString()}</p>
                 </div>
               </div>
               {issue.status !== 'open' && (
@@ -169,12 +182,26 @@ export default function IssueDetail() {
                   </div>
                   <div>
                     <p className="text-sm font-bold text-gray-900">Resolved</p>
-                    <p className="text-xs text-gray-500">{new Date(issue.updated_at || issue.created_at).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">{new Date(updatedAt || createdAt).toLocaleString()}</p>
                   </div>
                 </div>
               )}
             </div>
           </div>
+
+          {isOfficer && issue.status === 'open' && (
+            <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 mt-10">
+              <h3 className="font-bold text-blue-900 mb-4 text-lg">Officer Actions</h3>
+              <p className="text-sm text-blue-700 mb-4">You must claim this issue before you can mark it as resolved.</p>
+              <button
+                onClick={claimIssue}
+                disabled={claiming}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl disabled:bg-blue-300 transition shadow-lg shadow-blue-100 transform active:scale-[0.98]"
+              >
+                {claiming ? 'Claiming...' : 'Claim Issue'}
+              </button>
+            </div>
+          )}
 
           {isOfficer && issue.status === 'claimed' && (
             <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 mt-10">

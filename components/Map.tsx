@@ -94,7 +94,7 @@ export default function Map({ issues = [], selectable = false, selectedPos = nul
 
   return (
     <div className="w-full h-[500px] relative rounded-lg overflow-hidden shadow-lg border border-gray-200">
-      <MapContainer center={center} zoom={13} style={{ width: '100%', height: '100%' }}>
+      <MapContainer center={center} zoom={13} scrollWheelZoom={false} style={{ width: '100%', height: '100%' }}>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

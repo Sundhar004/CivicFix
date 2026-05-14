@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import connectToDatabase from '@/lib/mongodb'
+import Issue from '@/models/Issue'
 
 export async function GET(req: Request) {
   const url = new URL(req.url)
@@ -9,19 +10,18 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'userId is required' }, { status: 400 })
   }
 
-  const authHeader = req.headers.get('authorization')
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: authHeader || '' } } }
-  )
+  try {
+    await connectToDatabase()
+    
+    const issues = await Issue.find({ createdBy: userId }).sort({ createdAt: -1 })
+    
+    const mappedIssues = issues.map(issue => {
+      const obj = issue.toObject();
+      return { ...obj, id: obj._id.toString(), created_at: obj.createdAt, image_url: obj.imageUrl };
+    });
 
-  const { data, error } = await supabase
-    .from('issues')
-    .select('*')
-    .eq('created_by', userId)
-    .order('created_at', { ascending: false })
-  
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data)
+    return NextResponse.json(mappedIssues)
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 })
+  }
 }

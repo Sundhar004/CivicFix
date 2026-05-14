@@ -1,39 +1,50 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import connectToDatabase from '@/lib/mongodb'
+import Issue from '@/models/Issue'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 
 export async function GET(req: Request) {
-  const authHeader = req.headers.get('authorization')
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: authHeader || '' } } }
-  )
+  try {
+    await connectToDatabase()
+    // Find all issues, sorted by created_at descending
+    const issues = await Issue.find({}).sort({ createdAt: -1 })
+    
+    // Map _id to id to maintain frontend compatibility
+    const mappedIssues = issues.map(issue => {
+      const obj = issue.toObject();
+      return { ...obj, id: obj._id.toString(), created_at: obj.createdAt };
+    });
 
-  const { data, error } = await supabase.from('issues').select('*').order('created_at', { ascending: false })
-  
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data)
+    return NextResponse.json(mappedIssues)
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 })
+  }
 }
 
 export async function POST(req: Request) {
-  const authHeader = req.headers.get('authorization')
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { global: { headers: { Authorization: authHeader || '' } } }
-  )
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
 
-  const body = await req.json()
-  
-  const { data, error } = await supabase.from('issues').insert({
-    title: body.title,
-    description: body.description,
-    lat: body.lat,
-    lng: body.lng,
-    image_url: body.image_url,
-    created_by: body.created_by
-  }).select()
+    await connectToDatabase()
+    const body = await req.json()
+    
+    const issue = await Issue.create({
+      title: body.title,
+      description: body.description,
+      lat: body.lat,
+      lng: body.lng,
+      imageUrl: body.image_url,
+      createdBy: (session.user as any).id,
+    })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-  return NextResponse.json(data[0])
+    const mappedIssue = { ...issue.toObject(), id: issue._id.toString() }
+
+    return NextResponse.json(mappedIssue)
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 400 })
+  }
 }

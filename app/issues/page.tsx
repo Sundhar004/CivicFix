@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
 
 export default function IssuesList() {
   const [issues, setIssues] = useState<any[]>([])
@@ -13,13 +12,17 @@ export default function IssuesList() {
   }, [])
 
   async function fetchIssues() {
-    const { data, error } = await supabase
-      .from('issues')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (data) setIssues(data)
-    setLoading(false)
+    try {
+      const res = await fetch('/api/issues')
+      if (res.ok) {
+        const data = await res.json()
+        setIssues(data)
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
   }
 
   const filteredIssues = issues.filter(issue => {

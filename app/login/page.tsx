@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 
 export default function Login() {
@@ -21,26 +21,22 @@ export default function Login() {
     setIsLoading(true)
 
     try {
-      if (isRegistering) {
-        const { data, error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              role: role
-            }
-          }
-        })
-        if (error) throw error
+      const res = await signIn('credentials', {
+        redirect: false,
+        email,
+        password,
+        role: isRegistering ? role : undefined,
+        isRegistering: isRegistering ? 'true' : 'false',
+      });
 
-        setMessage('Registration successful! Please check your email for verification. Once verified, your role will be active.')
+      if (res?.error) {
+        throw new Error(res.error);
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password
-        })
-        if (error) throw error
-        router.push('/')
+        if (isRegistering) {
+          setMessage('Registration successful! Signing you in...');
+        }
+        router.push('/');
+        router.refresh();
       }
     } catch (err: any) {
       setError(err.message)

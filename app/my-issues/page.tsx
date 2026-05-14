@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { useSession } from 'next-auth/react'
 
 export default function MyIssues() {
   const [issues, setIssues] = useState<any[]>([])
@@ -10,26 +10,22 @@ export default function MyIssues() {
   const [error, setError] = useState('')
   const router = useRouter()
 
+  const { data: session, status } = useSession()
+
   useEffect(() => {
-    fetchMyIssues()
-  }, [])
+    if (status === 'unauthenticated') {
+      router.push('/login')
+    } else if (status === 'authenticated') {
+      fetchMyIssues()
+    }
+  }, [status])
 
   async function fetchMyIssues() {
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      if (userError || !userData?.user) {
-        router.push('/login')
-        return
-      }
-
-      const { data, error } = await supabase
-        .from('issues')
-        .select('*')
-        .eq('created_by', userData.user.id)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      if (data) setIssues(data)
+      const res = await fetch(`/api/my-issues?userId=${(session?.user as any).id}`)
+      if (!res.ok) throw new Error('Failed to fetch issues')
+      const data = await res.json()
+      setIssues(data)
     } catch (err: any) {
       setError(err.message)
     } finally {

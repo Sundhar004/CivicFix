@@ -1,57 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, usePathname } from 'next/navigation'
-import { supabase } from '@/lib/supabase'
+import { usePathname } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
 
 export default function Header() {
-    const [role, setRole] = useState<'citizen' | 'officer' | 'anon'>('anon')
-    const [loading, setLoading] = useState(true)
-    const [user, setUser] = useState<any>(null)
-    const router = useRouter()
+    const { data: session, status } = useSession();
+    const loading = status === 'loading';
+    const user = session?.user as any;
+    const role = user?.role || 'anon';
     const pathname = usePathname()
-
-    useEffect(() => {
-        const fetchUserAndRole = async (sessionUser: any) => {
-            if (sessionUser) {
-                setUser(sessionUser)
-                const { data: roleData } = await supabase
-                    .from('user_roles')
-                    .select('role')
-                    .eq('user_id', sessionUser.id)
-                    .single()
-
-                if (roleData) {
-                    setRole(roleData.role as any)
-                } else {
-                    setRole('anon')
-                }
-            } else {
-                setUser(null)
-                setRole('anon')
-            }
-            setLoading(false)
-        }
-
-        // Initial check
-        supabase.auth.getUser().then(({ data }) => {
-            fetchUserAndRole(data.user)
-        })
-
-        // Listen for changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            fetchUserAndRole(session?.user || null)
-        })
-
-        return () => subscription.unsubscribe()
-    }, [])
-
-    const handleSignOut = async () => {
-        await supabase.auth.signOut()
-        router.push('/login')
-        router.refresh()
-    }
 
     return (
         <header className="bg-white border-b border-gray-100 shadow-sm sticky top-0 z-50">
@@ -68,7 +26,10 @@ export default function Header() {
                         <Link href="/my-issues" className={`transition ${pathname === '/my-issues' ? 'text-blue-600' : 'hover:text-blue-600'}`}>My Reports</Link>
                     )}
                     {role === 'officer' && (
-                        <Link href="/officer" className={`transition ${pathname === '/officer' ? 'text-orange-500' : 'text-orange-500 hover:text-orange-600'}`}>Officer Portal</Link>
+                        <>
+                            <Link href="/officer" className={`transition ${pathname === '/officer' ? 'text-orange-500' : 'text-orange-500 hover:text-orange-600'}`}>Officer Portal</Link>
+                            <Link href="/insights" className={`transition ${pathname === '/insights' ? 'text-purple-500' : 'text-purple-500 hover:text-purple-600'}`}>Officer Insights</Link>
+                        </>
                     )}
                 </nav>
 
@@ -81,15 +42,17 @@ export default function Header() {
 
                     {user ? (
                         <button
-                            onClick={handleSignOut}
+                            onClick={() => signOut({ callbackUrl: '/login' })}
                             className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-bold transition"
                         >
                             Sign Out
                         </button>
                     ) : (
-                        <Link href="/login" className="text-gray-400 hover:text-gray-600 transition font-bold text-sm">
-                            Sign In
-                        </Link>
+                        !loading && (
+                            <Link href="/login" className="text-gray-400 hover:text-gray-600 transition font-bold text-sm">
+                                Sign In
+                            </Link>
+                        )
                     )}
                 </div>
             </div>

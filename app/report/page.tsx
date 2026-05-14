@@ -3,12 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
-import { supabase } from '@/lib/supabase'
+import { useSession } from 'next-auth/react'
 
 const MapWithNoSSR = dynamic(() => import('@/components/Map'), { ssr: false })
 
 export default function ReportIssue() {
   const router = useRouter()
+  const { data: session } = useSession()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [file, setFile] = useState<File | null>(null)
@@ -45,33 +46,34 @@ export default function ReportIssue() {
     setError('')
 
     try {
-      const { data: userData, error: userError } = await supabase.auth.getUser()
-      if (userError || !userData?.user) throw new Error('You must be logged in to report an issue')
+      if (!session?.user) throw new Error('You must be logged in to report an issue')
 
       let imageUrl = null
       if (file) {
-        const fileExt = file.name.split('.').pop()
-        const fileName = `${Math.random()}.${fileExt}`
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from('issues')
-          .upload(fileName, file)
-
-        if (uploadError) throw new Error('Image upload failed: ' + uploadError.message)
-
-        const { data: urlData } = supabase.storage.from('issues').getPublicUrl(fileName)
-        imageUrl = urlData.publicUrl
+        const formData = new FormData()
+        formData.append('file', file)
+        const uploadRes = await fetch('/api/upload', {
+          method: 'POST',
+          body: formData,
+        })
+        const uploadData = await uploadRes.json()
+        if (!uploadRes.ok) throw new Error(uploadData.error || 'Image upload failed')
+        imageUrl = uploadData.url
       }
 
-      const { data, error: insertError } = await supabase.from('issues').insert({
-        title,
-        description,
-        lat: location[0],
-        lng: location[1],
-        image_url: imageUrl,
-        created_by: userData.user.id
-      }).select()
-
-      if (insertError) throw insertError
+      const res = await fetch('/api/issues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          description,
+          lat: location[0],
+          lng: location[1],
+          image_url: imageUrl,
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to submit report')
 
       router.push('/my-issues')
       router.refresh()
