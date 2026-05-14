@@ -6,7 +6,7 @@ Crowdsourced Civic Issue Reporting MVP.
 - **Framework:** Next.js 14 (App Router)
 - **Styling:** Tailwind CSS
 - **Map:** React-Leaflet
-- **Backend:** PostgreSQL, Auth, Storage
+- **Backend:** MongoDB, NextAuth, Cloudinary
 
 ## Core User Flows
 1. **Citizen:** Report a pothole or civic issue with a photo + GPS, viewable on a public map.
@@ -22,19 +22,18 @@ Crowdsourced Civic Issue Reporting MVP.
    npm install
    ```
 
-2. **Supabase Environment**
+2. **Environment Variables**
    Duplicate `.env.local.example` to `.env.local` and add your keys:
    ```env
-   NEXT_PUBLIC_SUPABASE_URL=your_project_url
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-   SUPABASE_SERVICE_ROLE_KEY=your_service_key
+   MONGODB_URI=your_mongodb_uri
+   NEXTAUTH_SECRET=your_nextauth_secret
+   NEXTAUTH_URL=http://localhost:3000
+   CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+   CLOUDINARY_API_KEY=your_cloudinary_api_key
+   CLOUDINARY_API_SECRET=your_cloudinary_api_secret
    ```
 
-3. **Database Schema**
-   Run the SQL provided in `supabase/sql/schema.sql` inside your Supabase SQL Editor.
-   Create a storage bucket named `issues` and set the policy to 'public' for images.
-
-4. **Run Locally**
+3. **Run Locally**
    ```bash
    npm run dev
    ```
