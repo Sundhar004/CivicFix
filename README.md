@@ -1,6 +1,10 @@
-# CivicFix
+# CivicFix 🚀
 
-Crowdsourced Civic Issue Reporting MVP.
+> **Live Demo:** [https://civic-fix-pi.vercel.app/](https://civic-fix-pi.vercel.app/)
+
+CivicFix is a modern, crowdsourced civic issue reporting platform built to bridge the gap between citizens and local authorities. Citizens can report issues with geolocated photos, and officers can claim and resolve them in real-time.
+
+---
 
 ## Tech Stack
 - **Framework:** Next.js 14 (App Router)
