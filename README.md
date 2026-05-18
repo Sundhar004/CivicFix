@@ -7,6 +7,8 @@
 [![Cloudinary](https://img.shields.io/badge/Media%20Storage-Cloudinary-3448C5.svg)](https://cloudinary.com/)
 [![Live Demo](https://img.shields.io/badge/Live-Demo-brightgreen.svg)](https://civic-fix-pi.vercel.app/)
 
+> 🚀 **Live Demo:** **[https://civic-fix-pi.vercel.app/](https://civic-fix-pi.vercel.app/)**
+
 **CivicFix** is a state-of-the-art crowdsourced civic issue reporting platform built to close the gap between active citizens and local municipal authorities. Citizens can report local concerns (potholes, garbage, broken streetlights) with geolocated photos. Municipal officers can then claim, manage, and resolve these issues in real-time, uploading visual proof of completion.
 
 ---
